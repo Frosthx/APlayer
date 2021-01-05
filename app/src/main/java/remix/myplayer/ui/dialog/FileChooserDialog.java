@@ -1,5 +1,7 @@
 package remix.myplayer.ui.dialog;
 
+import static remix.myplayer.theme.Theme.getBaseDialog;
+
 import android.Manifest;
 import android.app.Activity;
 import android.app.Dialog;
@@ -8,27 +10,24 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.annotation.StringRes;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.app.DialogFragment;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentActivity;
-import android.support.v7.app.AppCompatActivity;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
+import androidx.core.app.ActivityCompat;
+import androidx.fragment.app.DialogFragment;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
+import androidx.appcompat.app.AppCompatActivity;
 import android.view.View;
 import android.webkit.MimeTypeMap;
-
 import com.afollestad.materialdialogs.DialogAction;
 import com.afollestad.materialdialogs.MaterialDialog;
-
 import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-
 import remix.myplayer.R;
 import remix.myplayer.theme.ThemeStore;
 
@@ -162,14 +161,11 @@ public class FileChooserDialog extends DialogFragment implements MaterialDialog.
     parentFolder = new File(getArguments().getString("current_path"));
     checkIfCanGoUp();
     parentContents = listFiles(getBuilder().mimeType, getBuilder().extensions);
-    return new MaterialDialog.Builder(getActivity())
+    return getBaseDialog(getActivity())
         .title(parentFolder.getAbsolutePath())
-        .titleColorAttr(R.attr.text_color_primary)
         .theme(ThemeStore.getMDDialogTheme())
-        .itemsColorAttr(R.attr.text_color_primary)
         .items(getContentsArray())
         .itemsCallback(this)
-        .buttonRippleColorAttr(R.attr.ripple_color)
         .onNegative(new MaterialDialog.SingleButtonCallback() {
           @Override
           public void onClick(@NonNull MaterialDialog dialog,

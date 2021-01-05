@@ -3,10 +3,6 @@
 /.idea
 *.iml
 /build
-/.git
+.DS_Store
 
-/app/app-release.apk
 
-StackBlur/build
-PushSDK/build
-app/.externalNativeBuild/

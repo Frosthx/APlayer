@@ -1,7 +1,13 @@
 apply plugin: 'com.android.application'
-apply plugin: "kotlin-android"
+apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-android-extensions'
 apply plugin: 'kotlin-kapt'
+apply plugin: 'bugly'
+
+bugly {
+    appId = "${getProperty(getProperties('../local.properties'), 'BUGLY_APPID')}"
+    appKey = "04ab39c8-86fc-4ed6-b28b-6fdfee6e19d9"
+}
 
 repositories {
     maven {
@@ -10,26 +16,24 @@ repositories {
 }
 
 ext {
-    supportLibVersion = '26.1.0'
+    supportLibVersion = '28.0.0'
 }
 
 android {
-    compileSdkVersion 26
-    buildToolsVersion '27.0.3'
-
+    compileSdkVersion 29
+//    buildToolsVersion '28.0.3'
 
     defaultConfig {
         applicationId "remix.myplayer"
-        minSdkVersion 16
-        targetSdkVersion 26
-        versionCode 79
-        versionName "1.3.5.1"
+        minSdkVersion 17
+        targetSdkVersion 29
+
+        versionCode 15691
+        versionName "1.5.6.9"
+
         flavorDimensions "default"
         vectorDrawables.useSupportLibrary = true
-        ndk {
-            abiFilters 'armeabi-v7a'
-//            abiFilters 'armeabi-v7a', 'x86'
-        }
+
         externalNativeBuild {
             cmake {
                 cppFlags ""
@@ -39,22 +43,24 @@ android {
 
         buildConfigField("String", "LASTFM_API_KEY", "\"${getProperty(getProperties('../local.properties'), 'LASTFM_API_KEY')}\"")
         buildConfigField("String", "GOOGLE_PLAY_LICENSE_KEY", "\"${getProperty(getProperties('../local.properties'), 'GOOGLE_PLAY_LICENSE_KEY')}\"")
+        buildConfigField("String", "BUGLY_APPID", "\"${getProperty(getProperties('../local.properties'), 'BUGLY_APPID')}\"")
+        buildConfigField("String", "GITHUB_SECRET_KEY", "\"${getProperty(getProperties('../local.properties'), 'GITHUB_SECRET_KEY')}\"")
     }
 
     signingConfigs {
         debug {
-            storeFile file("./Debug.jks")
-            storePassword "123456"
-            keyAlias "Debug"
-            keyPassword "123456"
+            v1SigningEnabled true
+            v2SigningEnabled true
         }
         release {
-            def properties = new Properties()
-            properties.load(file('../local.properties').newDataInputStream())
+            def properties = getProperties('../local.properties')
             keyAlias properties['keystore.keyAlias']
             keyPassword properties['keystore.keyPassword']
             storeFile file(properties['keystore.storeFile'])
             storePassword properties['keystore.storePassword']
+
+            v1SigningEnabled true
+            v2SigningEnabled true
         }
     }
 
@@ -63,19 +69,31 @@ android {
             signingConfig signingConfigs.release
             debuggable true
             minifyEnabled false
+
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-DEBUG'
+
+            ndk {
+                abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86'
+            }
         }
         release {
             //混淆代码
+            signingConfig signingConfigs.release
             minifyEnabled true
             debuggable false
             zipAlignEnabled true
-            shrinkResources false
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
 
-            android.applicationVariants.all { variant ->
-                variant.outputs.all {
-                    outputFileName = "APlayer_v${defaultConfig.versionName}_${variant.productFlavors[0].name}_${releaseTime()}.apk"
-                }
+            ndk {
+                abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86'
+            }
+        }
+
+        android.applicationVariants.all {variant ->
+            variant.outputs.all {
+                outputFileName = "APlayer_v${defaultConfig.versionName}_${variant.productFlavors[0].name}_${new Date().format("yyyy-MM-dd HH-mm")}.apk"
             }
         }
     }
@@ -86,26 +104,20 @@ android {
         }
     }
 
-    productFlavors {
-//        tencent{}
-//        alibaba{}
-//        meizu{}
-//        assistant91{}
-//        baidu{}
-//        anzhuomarket{}
-
-        chuizi{}
-        qihu360{}
-        xiaomi{}
-        kuan {}
-        google{}
-        productFlavors.all { flavor ->
-            flavor.manifestPlaceholders = [CHANNEL_VALUE: name]
-        }
+    androidExtensions {
+        experimental = true
     }
 
-    sourceSets {
-        main.java.srcDirs += 'src/main/kotlin'
+    productFlavors {
+        assistant91 {}
+        baidu {}
+        anzhuomarket {}
+        xiaomi {}
+        kuan {}
+        google {}
+        productFlavors.all {flavor ->
+            flavor.manifestPlaceholders = [CHANNEL_VALUE: name]
+        }
     }
 
     lintOptions {
@@ -115,17 +127,8 @@ android {
         disable 'InvalidPackage'
     }
 
-    packagingOptions {
-        exclude 'META-INF/rxjava.properties'
-    }
-
-    configurations {
-        implementation.exclude module: 'okio'
-        implementation.exclude module: 'gson'
-    }
-
     configurations.all {
-        resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+        resolutionStrategy.eachDependency {DependencyResolveDetails details ->
             def requested = details.requested
             if (requested.group == 'com.android.support') {
                 if (!requested.name.startsWith("multidex")) {
@@ -139,58 +142,98 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
+
+    repositories {
+        flatDir {
+            dirs 'libs'
+        }
+    }
+
+//    packagingOptions {
+//        exclude 'META-INF/proguard/coroutines.pro'
+//    }
 }
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     testImplementation 'junit:junit:4.12'
-//    implementation 'com.android.support.constraint:constraint-layout:1.1.0'
-    implementation "com.android.support:appcompat-v7:$supportLibVersion"
-    implementation "com.android.support:design:$supportLibVersion"
-    implementation "com.android.support:palette-v7:$supportLibVersion"
-    implementation "com.android.support:cardview-v7:$supportLibVersion"
-    implementation 'com.android.support:multidex:1.0.3'
-    implementation 'com.facebook.fresco:fresco:1.9.0'
-    implementation 'com.facebook.rebound:rebound:0.3.8'
-    implementation 'com.umeng.sdk:common:1.4.4'
-    implementation 'com.umeng.sdk:analytics:7.4.4'
+
+    //support
+    implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
+    implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation 'com.google.android.material:material:1.2.1'
+    implementation 'androidx.palette:palette-ktx:1.0.0'
+    implementation 'androidx.cardview:cardview:1.0.0'
+    implementation 'androidx.media:media:1.2.1'
+    implementation 'androidx.multidex:multidex:2.0.1'
+//    implementation 'com.google.android.material:material:1.3.0-alpha04'
+
+    //coroutine
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.3.0-M2'
+
+    //fresco
+    implementation 'com.remix.fresco:fresco:1.10.2'
+
+    //materialDialog
     implementation 'com.afollestad.material-dialogs:core:0.9.6.0'
-    implementation 'com.soundcloud.android:android-crop:1.0.1@aar'
-    implementation 'com.jakewharton:butterknife:8.8.1'
-    implementation 'com.github.promeg:tinypinyin:2.0.1'
-    implementation 'io.reactivex.rxjava2:rxandroid:2.0.2'
-    implementation 'io.reactivex.rxjava2:rxjava:2.1.13'
-    implementation 'com.squareup.retrofit2:retrofit:2.4.0'
-    implementation 'com.squareup.retrofit2:converter-gson:2.4.0'
-    implementation 'com.squareup.retrofit2:adapter-rxjava2:2.4.0'
+
+    //rx
+    implementation 'io.reactivex.rxjava2:rxandroid:2.1.1'
+    implementation 'io.reactivex.rxjava2:rxjava:2.2.11'
+
+    //retrofit
+    implementation 'com.squareup.retrofit2:retrofit:2.6.2'
+    implementation 'com.squareup.retrofit2:converter-gson:2.6.2'
+    implementation 'com.squareup.retrofit2:adapter-rxjava2:2.6.2'
+
+    //rxpermission
     implementation 'com.tbruyelle.rxpermissions2:rxpermissions:0.9.4@aar'
-    implementation 'androidx.core:core-ktx:0.3'
+
+    //kotlin
     implementation 'org.jetbrains.anko:anko-common:0.10.4'
-    debugImplementation 'com.squareup.leakcanary:leakcanary-android:1.5.4'
-    releaseImplementation 'com.squareup.leakcanary:leakcanary-android-no-op:1.5.4'
-    kapt  'com.jakewharton:butterknife-compiler:8.8.1'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
 
-    implementation 'cn.bmob.android:bmob-sdk:3.6.1'
-    implementation 'com.android.support.constraint:constraint-layout:1.1.2'
-//    implementation 'com.android.billingclient:billing:1.1'
-    implementation 'com.anjlab.android.iab.v3:library:1.0.44'
-//    implementation 'com.squareup.okhttp3:okhttp:3.10.0'
-//    implementation 'com.google.code.gson:gson:2.8.2'
+    //leakCanary
+    debugImplementation 'com.squareup.leakcanary:leakcanary-android:2.0-beta-2'
 
-//    implementation 'tv.danmaku.ijk.media:ijkplayer-java:0.8.8'
-//    implementation 'tv.danmaku.ijk.media:ijkplayer-armv7a:0.8.8'
-//    implementation 'tv.danmaku.ijk.media:ijkplayer-x86:0.8.8'
-}
+    //butterKnife
+    implementation 'com.jakewharton:butterknife:9.0.0'
+    kapt 'com.jakewharton:butterknife-compiler:9.0.0'
 
-def releaseTime() {
-    return new Date().format("yyyy-MM-dd HH-mm")
+    //bugly
+    implementation 'com.tencent.bugly:crashreport:3.0.0'
+
+    //gp
+    implementation 'com.anjlab.android.iab.v3:library:1.1.0'
+
+    //room
+    implementation 'androidx.room:room-runtime:2.2.6'
+    kapt 'androidx.room:room-compiler:2.2.6' // use kapt for Kotlin
+    implementation 'androidx.room:room-rxjava2:2.2.6'
+
+    //rxlife
+//    implementation 'com.trello.rxlifecycle3:rxlifecycle:3.0.0'
+//    implementation 'com.trello.rxlifecycle3:rxlifecycle-android:3.0.0'
+//    implementation 'com.trello.rxlifecycle3:rxlifecycle-components:3.0.0'
+//    implementation 'com.trello.rxlifecycle3:rxlifecycle-kotlin:3.0.0'
+
+    //timber
+    implementation 'com.jakewharton.timber:timber:4.7.1'
+
+    //other
+    implementation 'com.facebook.rebound:rebound:0.3.8'
+    implementation 'com.soundcloud.android:android-crop:1.0.1@aar'
+    implementation 'com.github.promeg:tinypinyin:2.0.1'
+    implementation 'org.slf4j:slf4j-api:1.7.28'
+    implementation 'com.github.tony19:logback-android:2.0.0'
+
 }
 
 def getProperties(String fileName) {
-    final def Properties properties = new Properties()
+    final Properties properties = new Properties()
     def file = file(fileName)
     if (file.exists()) {
-        file.withInputStream { stream -> properties.load(stream) }
+        file.withInputStream {stream -> properties.load(stream)}
     }
     return properties
 }
@@ -199,7 +242,4 @@ def getProperty(Properties properties, String name) {
     return properties.getProperty(name) ?: "$name missing"
 }
 
-kapt {
-    generateStubs = true
-}
 

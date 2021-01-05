@@ -1,30 +1,29 @@
 package remix.myplayer.ui.fragment;
 
 
+import static remix.myplayer.helper.MusicServiceRemote.setPlayQueue;
+import static remix.myplayer.service.MusicService.EXTRA_POSITION;
+import static remix.myplayer.util.MusicUtil.makeCmdIntent;
+
 import android.content.Context;
-import android.content.Intent;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
-import android.support.v4.content.Loader;
-import android.support.v7.widget.DefaultItemAnimator;
-import android.support.v7.widget.LinearLayoutManager;
+import androidx.annotation.Nullable;
+import androidx.loader.content.Loader;
+import androidx.recyclerview.widget.DefaultItemAnimator;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import android.view.View;
-
-import java.util.ArrayList;
-import java.util.List;
-
 import butterknife.BindView;
+import java.util.List;
 import remix.myplayer.R;
-import remix.myplayer.adapter.SongAdapter;
-import remix.myplayer.asynctask.WrappedAsyncTaskLoader;
 import remix.myplayer.bean.mp3.Song;
-import remix.myplayer.interfaces.LoaderIds;
-import remix.myplayer.interfaces.OnItemClickListener;
+import remix.myplayer.helper.MusicServiceRemote;
+import remix.myplayer.misc.asynctask.WrappedAsyncTaskLoader;
+import remix.myplayer.misc.interfaces.LoaderIds;
+import remix.myplayer.misc.interfaces.OnItemClickListener;
 import remix.myplayer.service.Command;
-import remix.myplayer.service.MusicService;
-import remix.myplayer.ui.customview.fastcroll_recyclerview.FastScrollRecyclerView;
-import remix.myplayer.util.Constants;
-import remix.myplayer.util.Global;
+import remix.myplayer.ui.activity.MainActivity;
+import remix.myplayer.ui.adapter.SongAdapter;
+import remix.myplayer.ui.widget.fastcroll_recyclerview.LocationRecyclerView;
 import remix.myplayer.util.MediaStoreUtil;
 
 /**
@@ -34,114 +33,103 @@ import remix.myplayer.util.MediaStoreUtil;
 /**
  * 全部歌曲的Fragment
  */
-public class SongFragment extends LibraryFragment<Song,SongAdapter> {
-    @BindView(R.id.recyclerview)
-    FastScrollRecyclerView mRecyclerView;
+public class SongFragment extends LibraryFragment<Song, SongAdapter> {
 
-    public static final String TAG = SongFragment.class.getSimpleName();
+  @BindView(R.id.location_recyclerView)
+  LocationRecyclerView mRecyclerView;
 
-    @Override
-    public void onCreate(@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        mPageName = TAG;
-    }
+  public static final String TAG = SongFragment.class.getSimpleName();
 
-    @Override
-    protected int getLayoutID() {
-        return R.layout.fragment_song;
-    }
+  @Override
+  public void onCreate(@Nullable Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    mPageName = TAG;
+  }
 
-    @Override
-    protected void initAdapter() {
-        mAdapter = new SongAdapter(mContext,R.layout.item_song_recycle,mMultiChoice, SongAdapter.ALLSONG,mRecyclerView);
-        mAdapter.setOnItemClickListener(new OnItemClickListener() {
-            @Override
-            public void onItemClick(View view, int position) {
-                int id = getSongID(position);
-                if(id > 0 && !mMultiChoice.itemClick(mAdapter,position,id,TAG)){
-                    Intent intent = new Intent(MusicService.ACTION_CMD);
-                    Bundle arg = new Bundle();
-                    arg.putInt("Control", Command.PLAYSELECTEDSONG);
-                    arg.putInt("Position", position);
-                    intent.putExtras(arg);
-                    Global.setPlayQueue(Global.AllSongList,mContext,intent);
-                }
+  @Override
+  protected int getLayoutID() {
+    return R.layout.fragment_song;
+  }
+
+  @Override
+  protected void initAdapter() {
+    mAdapter = new SongAdapter(R.layout.item_song_recycle, mChoice, mRecyclerView);
+    mAdapter.setOnItemClickListener(new OnItemClickListener() {
+      @Override
+      public void onItemClick(View view, int position) {
+        final Song song = mAdapter.getDatas().get(position);
+        if (getUserVisibleHint() && !mChoice.click(position, song)) {
+          if (MusicServiceRemote.isPlaying() && song.equals(MusicServiceRemote.getCurrentSong())) {
+            if (requireActivity() instanceof MainActivity) {
+              ((MainActivity) requireActivity()).toPlayerActivity();
             }
-            @Override
-            public void onItemLongClick(View view, int position) {
-                int id = getSongID(position);
-                if(getUserVisibleHint() && id > 0)
-                    mMultiChoice.itemLongClick(mAdapter,position,id,TAG,Constants.SONG);
+          } else {
+            //设置正在播放列表
+            final List<Song> songs = mAdapter.getDatas();
+            if (songs == null || songs.isEmpty()) {
+              return;
             }
-        });
-
-    }
-
-    @Override
-    protected void initView() {
-        mRecyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-        mRecyclerView.setItemAnimator(new DefaultItemAnimator());
-        mRecyclerView.setAdapter(mAdapter);
-        mRecyclerView.setHasFixedSize(true);
-    }
-
-    /**
-     * 重新排序后需要重置全部歌曲列表
-     */
-    private synchronized void setAllSongList(){
-        if(mAdapter == null || mAdapter.getDatas() == null)
-            return;
-        if(Global.AllSongList == null)
-            Global.AllSongList = new ArrayList<>();
-        else
-            Global.AllSongList.clear();
-        for(Song song : mAdapter.getDatas()){
-            Global.AllSongList.add(song.getId());
+            setPlayQueue(songs, makeCmdIntent(Command.PLAYSELECTEDSONG)
+                .putExtra(EXTRA_POSITION, position));
+          }
         }
-    }
+      }
 
-    private int getSongID(int position){
-        int id = -1;
-        if(mAdapter.getDatas() != null && mAdapter.getDatas().size() > position - 1){
-            id = mAdapter.getDatas().get(position).getId();
+      @Override
+      public void onItemLongClick(View view, int position) {
+        if (getUserVisibleHint()) {
+          mChoice.longClick(position, mAdapter.getDatas().get(position));
         }
-        return id;
+      }
+    });
+
+  }
+
+  @Override
+  protected void initView() {
+    mRecyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+    mRecyclerView.setItemAnimator(new DefaultItemAnimator());
+    mRecyclerView.setAdapter(mAdapter);
+    mRecyclerView.setHasFixedSize(true);
+  }
+
+  @Override
+  protected Loader<List<Song>> getLoader() {
+    return new AsyncSongLoader(mContext);
+  }
+
+  @Override
+  protected int getLoaderId() {
+    return LoaderIds.SONG_FRAGMENT;
+  }
+
+
+  @Override
+  public SongAdapter getAdapter() {
+    return mAdapter;
+  }
+
+  @Override
+  public void onMetaChanged() {
+    super.onMetaChanged();
+    if (mAdapter != null) {
+      mAdapter.updatePlayingSong();
+    }
+  }
+
+  public void scrollToCurrent() {
+    mRecyclerView.smoothScrollToCurrentSong(mAdapter.getDatas());
+  }
+
+  private static class AsyncSongLoader extends WrappedAsyncTaskLoader<List<Song>> {
+
+    private AsyncSongLoader(Context context) {
+      super(context);
     }
 
     @Override
-    protected Loader<List<Song>> getLoader() {
-        return new AsyncSongLoader(mContext);
+    public List<Song> loadInBackground() {
+      return MediaStoreUtil.getAllSong();
     }
-
-    @Override
-    protected int getLoaderId() {
-        return LoaderIds.SONG_FRAGMENT;
-    }
-
-    @Override
-    public void onLoadFinished(Loader<List<Song>> loader, List<Song> data) {
-        super.onLoadFinished(loader, data);
-        new Thread(){
-            @Override
-            public void run() {
-                setAllSongList();
-            }
-        }.start();
-    }
-
-    @Override
-    public SongAdapter getAdapter(){
-        return mAdapter;
-    }
-
-    private static class AsyncSongLoader extends WrappedAsyncTaskLoader<List<Song>> {
-        private AsyncSongLoader(Context context) {
-            super(context);
-        }
-
-        @Override
-        public List<Song> loadInBackground() {
-            return MediaStoreUtil.getAllSong();
-        }
-    }
+  }
 }

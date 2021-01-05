@@ -56,24 +56,16 @@
     <fields>;
     <methods>;
 }
-#baseAdapter
--keepclassmembers class remix.myplayer.adapter.holder.BaseViewHolder
--keepclasseswithmembers class remix.myplayer.adapter.holder.BaseViewHolder {
-    <fields>;
-    <methods>;
-}
--keepclasseswithmembers class * extends remix.myplayer.adapter.holder.BaseViewHolder{
-    <fields>;
-    <methods>;
-}
+-keep class * extends remix.myplayer.ui.adapter.holder.BaseViewHolder{*;}
 
 -keep class **.R$* {*;}
 -keep public class remix.myplayer.R$*{
 public static final int *;
 }
--keepclasseswithmembers class * extends android.app.Activity{
-    <methods>;
+-keepclassmembers class ** {
+    @remix.myplayer.misc.handler.OnHandleMessage public *;
 }
+
 -keep public class * extends android.app.Activity
 -keep public class * extends android.app.Application
 -keep public class * extends android.app.Service
@@ -84,84 +76,44 @@ public static final int *;
 -keep public class com.android.vending.licensing.ILicensingService
 -keep public class * extends java.lang.annotation.Annotation
 -keep public class * extends android.os.Handler
+-keep class !android.support.v7.internal.view.menu.**,android.support.** {*;}
 
 -keep public class **.R$*{
    public static final int *;
 }
 
-#友盟统计
--keep class com.umeng.update.protobuffer.** {
-        public <fields>;
-        public <methods>;
-}
--keep class com.umeng.update.UmengUpdateAgent {
-        public <methods>;
-}
--keep public class com.umeng.example.R$*{
-    public static final int *;
-}
+#fresco
+# Keep our interfaces so they can be used by other ProGuard rules.
+# See http://sourceforge.net/p/proguard/bugs/466/
+-keep,allowobfuscation @interface com.facebook.common.internal.DoNotStrip
+-keep,allowobfuscation @interface com.facebook.soloader.DoNotOptimize
+
+# Do not strip any method/class that is annotated with @DoNotStrip
+-keep @com.facebook.common.internal.DoNotStrip class *
 -keepclassmembers class * {
-    public <init> (org.json.JSONObject);
+    @com.facebook.common.internal.DoNotStrip *;
 }
 
-# fresco
--keep class android.support.v4.** { *; }
--keep interface android.support.v4.app.** { *; }
+# Do not strip any method/class that is annotated with @DoNotOptimize
+-keep @com.facebook.soloader.DoNotOptimize class *
+-keepclassmembers class * {
+    @com.facebook.soloader.DoNotOptimize *;
+}
+
+# Keep native methods
+-keepclassmembers class * {
+    native <methods>;
+}
+
 -dontwarn okio.**
--dontwarn com.squareup.wire.**
--dontwarn com.umeng.update.**
--dontwarn android.support.v4.**
--keep class okio.** {*;}
--keep class com.squareup.wire.** {*;}
 -dontwarn com.squareup.okhttp.**
 -dontwarn okhttp3.**
 -dontwarn javax.annotation.**
 -dontwarn com.android.volley.toolbox.**
--keep,allowobfuscation @interface com.facebook.common.internal.DoNotStrip
--keep @com.facebook.common.internal.DoNotStrip class *
--dontwarn com.android.volley.toolbox.**
 -dontwarn com.facebook.infer.**
--keepclassmembers class * {
-    native <methods>;
-}
--keepclassmembers class * {
-    @com.facebook.common.internal.DoNotStrip *;
-}
--keepclassmembers class * {
-    native <methods>;
-}
--keep class com.facebook.imagepipeline.animated.factory.AnimatedFactoryImpl {
-    public AnimatedFactoryImpl(com.facebook.imagepipeline.bitmaps.PlatformBitmapFactory,com.facebook.imagepipeline.core.ExecutorSupplier);
-}
 
-# bomb
--dontwarn cn.bmob.v3.**
--keep class cn.bmob.v3.** {*;}
 
-# 确保JavaBean不被混淆-否则gson将无法将数据解析成具体对象
--keep class * extends cn.bmob.v3.BmobObject {
-    *;
-}
--keep class com.example.bmobexample.bean.BankCard{*;}
--keep class com.example.bmobexample.bean.GameScore{*;}
--keep class com.example.bmobexample.bean.MyUser{*;}
--keep class com.example.bmobexample.bean.Person{*;}
--keep class com.example.bmobexample.file.Movie{*;}
--keep class com.example.bmobexample.file.Song{*;}
--keep class com.example.bmobexample.relation.Post{*;}
--keep class com.example.bmobexample.relation.Comment{*;}
-
-# keep okhttp3、okio
--dontwarn javax.annotation.**
--dontwarn okhttp3.**
--keep class okhttp3.** { *;}
--keep interface okhttp3.** { *; }
--dontwarn okio.**
-
-# keep rx
--dontwarn sun.misc.**
--keep class io.reactivex.**{*;}
-
+#retrofit2
 -dontwarn retrofit2.**
 -keep class retrofit2.** { *; }
 
@@ -207,3 +159,30 @@ public static final int *;
 
 #ijkplayer
 -keep class tv.danmaku.ijk.media.player.** { *; }
+
+#bugly
+-dontwarn com.tencent.bugly.**
+-keep public class com.tencent.bugly.**{*;}
+
+#coroutine
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
+-keepnames class kotlinx.coroutines.android.AndroidExceptionPreHandler {}
+-keepnames class kotlinx.coroutines.android.AndroidDispatcherFactory {}
+-keepclassmembernames class kotlinx.** {
+    volatile <fields>;
+}
+
+# kotlinx
+-dontwarn kotlinx.**
+-keepnames class kotlinx.** { *; }
+-keepclassmembernames class kotlinx.** {
+    volatile <fields>;
+}
+
+# logback-android
+-keep class ch.qos.** { *; }
+-keep class org.slf4j.** { *; }
+-keepattributes *Annotation*
+-dontwarn ch.qos.logback.core.net.*
+

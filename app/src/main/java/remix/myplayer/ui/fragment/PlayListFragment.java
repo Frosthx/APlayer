@@ -1,28 +1,31 @@
 package remix.myplayer.ui.fragment;
 
+import static remix.myplayer.ui.adapter.HeaderAdapter.LIST_MODE;
+
 import android.content.Context;
-import android.content.Intent;
-import android.support.v4.content.Loader;
-import android.support.v7.widget.DefaultItemAnimator;
-import android.support.v7.widget.GridLayoutManager;
-import android.support.v7.widget.LinearLayoutManager;
+import androidx.loader.content.Loader;
+import androidx.recyclerview.widget.DefaultItemAnimator;
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import android.text.TextUtils;
 import android.view.View;
-
-import java.util.List;
-
 import butterknife.BindView;
+import java.util.List;
+import remix.myplayer.App;
 import remix.myplayer.R;
-import remix.myplayer.adapter.PlayListAdapter;
-import remix.myplayer.asynctask.WrappedAsyncTaskLoader;
-import remix.myplayer.bean.mp3.PlayList;
-import remix.myplayer.interfaces.LoaderIds;
-import remix.myplayer.interfaces.OnItemClickListener;
+import remix.myplayer.db.room.DatabaseRepository;
+import remix.myplayer.db.room.model.PlayList;
+import remix.myplayer.helper.SortOrder.PlayListSortOrder;
+import remix.myplayer.misc.asynctask.WrappedAsyncTaskLoader;
+import remix.myplayer.misc.interfaces.LoaderIds;
+import remix.myplayer.misc.interfaces.OnItemClickListener;
 import remix.myplayer.ui.activity.ChildHolderActivity;
-import remix.myplayer.ui.customview.fastcroll_recyclerview.FastScrollRecyclerView;
+import remix.myplayer.ui.adapter.HeaderAdapter;
+import remix.myplayer.ui.adapter.PlayListAdapter;
+import remix.myplayer.ui.widget.fastcroll_recyclerview.FastScrollRecyclerView;
 import remix.myplayer.util.Constants;
-import remix.myplayer.util.PlayListUtil;
 import remix.myplayer.util.SPUtil;
+import remix.myplayer.util.SPUtil.SETTING_KEY;
 import remix.myplayer.util.ToastUtil;
 
 /**
@@ -31,111 +34,89 @@ import remix.myplayer.util.ToastUtil;
  * @Author Xiaoborui
  * @Date 2016/10/8 09:46
  */
-public class PlayListFragment extends LibraryFragment<PlayList,PlayListAdapter>{
-    public static final String TAG = PlayListFragment.class.getSimpleName();
-    @BindView(R.id.playlist_recycleview)
-    FastScrollRecyclerView mRecyclerView;
+public class PlayListFragment extends LibraryFragment<PlayList, PlayListAdapter> {
 
-    @Override
-    protected int getLayoutID() {
-        return R.layout.fragment_playlist;
-    }
+  public static final String TAG = PlayListFragment.class.getSimpleName();
+  @BindView(R.id.recyclerView)
+  FastScrollRecyclerView mRecyclerView;
 
-    @Override
-    protected void initAdapter() {
-        mAdapter = new PlayListAdapter(mContext,R.layout.item_playlist_recycle_grid,mMultiChoice);
-        mAdapter.setModeChangeCallback(mode -> {
-            mRecyclerView.setLayoutManager(mode == Constants.LIST_MODEL ? new LinearLayoutManager(mContext) : new GridLayoutManager(mContext, 2));
-            mRecyclerView.setAdapter(mAdapter);
-        });
-        mAdapter.setOnItemClickListener(new OnItemClickListener() {
-            @Override
-            public void onItemClick(View view, int position) {
-                String name = getPlayListName(position);
-                if(!TextUtils.isEmpty(name) && !mMultiChoice.itemClick(mAdapter,position,getPlayListId(position),TAG)){
-                    if(getPlayListSongCount(position) == 0) {
-                        ToastUtil.show(mContext,getStringSafely(R.string.list_is_empty));
-                        return;
-                    }
-                    Intent intent = new Intent(mContext, ChildHolderActivity.class);
-                    intent.putExtra("Id", getPlayListId(position));
-                    intent.putExtra("Title", name);
-                    intent.putExtra("Type", Constants.PLAYLIST);
-                    intent.putExtra("PlayListID", getPlayListId(position));
-                    startActivity(intent);
-                }
-            }
+  @Override
+  protected int getLayoutID() {
+    return R.layout.fragment_playlist;
+  }
 
-            @Override
-            public void onItemLongClick(View view, int position) {
-                String name = getPlayListName(position);
-                if(!TextUtils.isEmpty(name))
-                    mMultiChoice.itemLongClick(mAdapter,position,getPlayListId(position),TAG,Constants.PLAYLIST);
-            }
-        });
-    }
-
-    @Override
-    protected void initView() {
-        int model = SPUtil.getValue(mContext,SPUtil.SETTING_KEY.SETTING_NAME,"PlayListModel",Constants.GRID_MODEL);
-        mRecyclerView.setItemAnimator(new DefaultItemAnimator());
-        mRecyclerView.setLayoutManager(model == 1 ? new LinearLayoutManager(mContext) : new GridLayoutManager(getActivity(), 2));
-        mRecyclerView.setAdapter(mAdapter);
-        mRecyclerView.setHasFixedSize(true);
-    }
-
-    private int getPlayListId(int position){
-        int playListId = -1;
-        if(mAdapter.getDatas() != null && mAdapter.getDatas().size() > position - 1){
-            playListId = mAdapter.getDatas().get(position)._Id;
+  @Override
+  protected void initAdapter() {
+    mAdapter = new PlayListAdapter(R.layout.item_playlist_recycle_grid, mChoice, mRecyclerView);
+    mAdapter.setOnItemClickListener(new OnItemClickListener() {
+      @Override
+      public void onItemClick(View view, int position) {
+        final PlayList playList = getAdapter().getDatas().get(position);
+        if (!TextUtils.isEmpty(playList.getName()) && getUserVisibleHint() && !mChoice
+            .click(position, playList)) {
+          if (playList.getAudioIds().isEmpty()) {
+            ToastUtil.show(mContext, getStringSafely(R.string.list_is_empty));
+            return;
+          }
+          ChildHolderActivity.start(mContext, Constants.PLAYLIST, playList.getId(), playList.getName());
         }
-        return playListId;
-    }
+      }
 
-    private String getPlayListName(int position){
-        String playlistName = "";
-        if(mAdapter.getDatas() != null && mAdapter.getDatas().size() > position - 1){
-            playlistName = mAdapter.getDatas().get(position).Name;
+      @Override
+      public void onItemLongClick(View view, int position) {
+        if (getUserVisibleHint()) {
+          mChoice.longClick(position, mAdapter.getDatas().get(position));
         }
-        return playlistName;
-    }
+      }
+    });
+  }
 
-    private int getPlayListSongCount(int position){
-        int count = 0;
-        if(mAdapter.getDatas() != null && mAdapter.getDatas().size() > position - 1){
-            count = mAdapter.getDatas().get(position).Count;
-        }
-        return count;
+  @Override
+  protected void initView() {
+    int model = SPUtil
+        .getValue(mContext, SPUtil.SETTING_KEY.NAME, SPUtil.SETTING_KEY.MODE_FOR_PLAYLIST,
+            HeaderAdapter.GRID_MODE);
+    mRecyclerView.setItemAnimator(new DefaultItemAnimator());
+    mRecyclerView.setLayoutManager(model == LIST_MODE ? new LinearLayoutManager(mContext)
+        : new GridLayoutManager(getActivity(), getSpanCount()));
+    mRecyclerView.setAdapter(mAdapter);
+    mRecyclerView.setHasFixedSize(true);
+  }
+
+  @Override
+  public PlayListAdapter getAdapter() {
+    return mAdapter;
+  }
+
+  @Override
+  public void onPlayListChanged(String name) {
+    if (name.equals(PlayList.TABLE_NAME)) {
+      onMediaStoreChanged();
+    }
+  }
+
+  @Override
+  protected Loader<List<PlayList>> getLoader() {
+    return new AsyncPlayListLoader(mContext);
+  }
+
+  @Override
+  protected int getLoaderId() {
+    return LoaderIds.PLAYLIST_FRAGMENT;
+  }
+
+  public static class AsyncPlayListLoader extends WrappedAsyncTaskLoader<List<PlayList>> {
+
+    public AsyncPlayListLoader(Context context) {
+      super(context);
     }
 
     @Override
-    public PlayListAdapter getAdapter() {
-        return mAdapter;
+    public List<PlayList> loadInBackground() {
+      final String sort = SPUtil.getValue(App.getContext(), SETTING_KEY.NAME, SETTING_KEY.PLAYLIST_SORT_ORDER,
+          PlayListSortOrder.PLAYLIST_A_Z);
+      return DatabaseRepository.getInstance()
+          .getSortPlayList("SELECT * FROM PlayList ORDER BY " + sort).blockingGet();
     }
-
-    @Override
-    public void onPlayListChanged() {
-        onMediaStoreChanged();
-    }
-
-    @Override
-    protected Loader<List<PlayList>> getLoader() {
-        return new AsyncPlayListLoader(mContext);
-    }
-
-    @Override
-    protected int getLoaderId() {
-        return LoaderIds.PLAYLIST_FRAGMENT;
-    }
-
-    private static class AsyncPlayListLoader extends WrappedAsyncTaskLoader<List<PlayList>> {
-        private AsyncPlayListLoader(Context context) {
-            super(context);
-        }
-
-        @Override
-        public List<PlayList> loadInBackground() {
-            return PlayListUtil.getAllPlayListInfo();
-        }
-    }
+  }
 }
