@@ -143,7 +143,7 @@ public class SPUtil {
     //是否自动下载艺术家封面
     String AUTO_DOWNLOAD_ARTIST_COVER = "auto_download_artist_cover";
     //曲库配置
-    String LIBRARY_CATEGORY = "library_category";
+    String LIBRARY = "library_category";
     //锁屏设置
     String LOCKSCREEN = "lockScreen";
     //导航浪变色
@@ -202,6 +202,8 @@ public class SPUtil {
     String TIMER_DEFAULT = "timer_default";
     //定时器时长
     String TIMER_DURATION = "timer_duration";
+    //定时结束后等待当前歌曲播放完毕
+    String TIMER_EXIT_AFTER_FINISH = "timer_exit_after_finish";
     //封面下载源
     String ALBUM_COVER_DOWNLOAD_SOURCE = "album_cover_download_source";
     //播放界面底部显示
@@ -246,6 +248,10 @@ public class SPUtil {
     String EXPORT_PLAYLIST_FOLDER = "export_playlist_folder";
     //自定义播放背景
     String PLAYER_BACKGROUND = "player_background";
+    // 深色主题
+    String DARK_THEME = "dark_theme";
+    // 黑色主题
+    String BLACK_THEME = "black_theme";
   }
 
   public interface LYRIC_OFFSET_KEY {

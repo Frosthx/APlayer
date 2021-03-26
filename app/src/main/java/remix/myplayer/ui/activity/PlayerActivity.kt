@@ -32,8 +32,6 @@ import androidx.fragment.app.FragmentManager
 import androidx.palette.graphics.Palette
 import androidx.palette.graphics.Palette.Swatch
 import androidx.viewpager.widget.ViewPager.OnPageChangeListener
-import butterknife.ButterKnife
-import butterknife.OnClick
 import io.reactivex.Completable
 import io.reactivex.Single
 import io.reactivex.android.schedulers.AndroidSchedulers
@@ -46,6 +44,7 @@ import kotlinx.android.synthetic.main.layout_player_topbar.*
 import kotlinx.android.synthetic.main.layout_player_volume.*
 import remix.myplayer.R
 import remix.myplayer.bean.mp3.Song
+import remix.myplayer.databinding.ActivityPlayerBinding
 import remix.myplayer.helper.MusicServiceRemote
 import remix.myplayer.helper.MusicServiceRemote.getCurrentSong
 import remix.myplayer.helper.MusicServiceRemote.getDuration
@@ -75,18 +74,19 @@ import remix.myplayer.theme.Theme
 import remix.myplayer.theme.ThemeStore
 import remix.myplayer.ui.activity.base.BaseMusicActivity
 import remix.myplayer.ui.adapter.PagerAdapter
+import remix.myplayer.ui.blur.StackBlurManager
 import remix.myplayer.ui.dialog.FileChooserDialog
 import remix.myplayer.ui.dialog.FileChooserDialog.FileCallback
 import remix.myplayer.ui.dialog.PlayQueueDialog
 import remix.myplayer.ui.dialog.PlayQueueDialog.Companion.newInstance
-import remix.myplayer.ui.fragment.CoverFragment
 import remix.myplayer.ui.fragment.LyricFragment
 import remix.myplayer.ui.fragment.RecordFragment
+import remix.myplayer.ui.fragment.player.CoverFragment
+import remix.myplayer.ui.fragment.player.RoundCoverFragment
 import remix.myplayer.util.*
 import remix.myplayer.util.SPUtil.SETTING_KEY
 import timber.log.Timber
 import java.io.File
-import java.lang.Exception
 import kotlin.math.abs
 
 /**
@@ -96,6 +96,8 @@ import kotlin.math.abs
  * 播放界面
  */
 class PlayerActivity : BaseMusicActivity(), FileCallback {
+  private lateinit var binding: ActivityPlayerBinding
+
   private var valueAnimator: ValueAnimator? = null
 
   //上次选中的Fragment
@@ -163,7 +165,7 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
   private val receiver: Receiver = Receiver()
 
   private val background by lazy {
-    SPUtil.getValue(this, SETTING_KEY.NAME, SETTING_KEY.PLAYER_BACKGROUND, BACKGROUND_THEME)
+    SPUtil.getValue(this, SETTING_KEY.NAME, SETTING_KEY.PLAYER_BACKGROUND, BACKGROUND_ADAPTIVE_COLOR)
   }
 
   override fun setUpTheme() {
@@ -172,7 +174,7 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
 //    } else {
 //      setTheme(R.style.AudioHolderStyle_Night);
 //    }
-    val superThemeRes = ThemeStore.getThemeRes()
+    val superThemeRes = ThemeStore.themeRes
     val themeRes: Int
     themeRes = when (superThemeRes) {
       R.style.Theme_APlayer_Black -> R.style.PlayerActivityStyle_Black
@@ -209,9 +211,23 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
 
         val file = File(DiskCache.getDiskCacheDir(this, "thumbnail/player"), "player.jpg");
         if (file.exists()) {
-          val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-          player_container.background = BitmapDrawable(resources, bitmap)
-          updateSwatch(bitmap)
+          Single
+              .fromCallable {
+                val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+                val blurBitmap = StackBlurManager(bitmap).processNatively(10)
+
+                blurBitmap
+              }
+              .compose(RxUtil.applySingleScheduler())
+              .onErrorReturn {
+                return@onErrorReturn BitmapFactory.decodeResource(resources, R.drawable.album_empty_bg_day)
+              }
+              .subscribe({
+                player_container.background = BitmapDrawable(resources, it)
+                updateSwatch(it)
+              }, {
+
+              })
         }
       }
     }
@@ -220,8 +236,8 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
   @SuppressLint("ClickableViewAccessibility")
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    setContentView(R.layout.activity_player)
-    ButterKnife.bind(this)
+    binding = ActivityPlayerBinding.inflate(layoutInflater)
+    setContentView(binding.root)
 
     song = getCurrentSong()
     if (song == Song.EMPTY_SONG && intent.hasExtra(EXTRA_SONG)) {
@@ -235,6 +251,29 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
     setUpSeekBar()
     setUpViewColor()
     Util.registerLocalReceiver(receiver, IntentFilter(ACTION_UPDATE_NEXT))
+
+    arrayOf(
+      binding.layoutPlayerControl.playbarNext,
+      binding.layoutPlayerControl.playbarPrev,
+      binding.layoutPlayerControl.playbarPlayContainer
+    ).forEach {
+      it.setOnClickListener(onCtrlClick)
+    }
+    arrayOf(
+      binding.layoutPlayerControl.playbarModel,
+      binding.layoutPlayerControl.playbarPlayinglist,
+      binding.topActionbar.topHide,
+      binding.topActionbar.topMore
+    ).forEach {
+      it.setOnClickListener(onOtherClick)
+    }
+    arrayOf(
+      binding.layoutPlayerVolume.volumeDown,
+      binding.layoutPlayerVolume.volumeUp,
+      binding.layoutPlayerVolume.nextSong
+    ).forEach {
+      it.setOnClickListener(onVolumeClick)
+    }
   }
 
   public override fun onResume() {
@@ -265,8 +304,7 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
   /**
    * 上一首 下一首 播放、暂停
    */
-  @OnClick(R.id.playbar_next, R.id.playbar_prev, R.id.playbar_play_container)
-  fun onCtrlClick(v: View) {
+  private val onCtrlClick = View.OnClickListener { v ->
     val intent = Intent(MusicService.ACTION_CMD)
     when (v.id) {
       R.id.playbar_prev -> intent.putExtra(MusicService.EXTRA_CONTROL, Command.PREV)
@@ -279,8 +317,7 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
   /**
    * 播放模式 播放列表 关闭 隐藏
    */
-  @OnClick(R.id.playbar_model, R.id.playbar_playinglist, R.id.top_hide, R.id.top_more)
-  fun onOtherClick(v: View) {
+  private val onOtherClick = View.OnClickListener { v ->
     when (v.id) {
       R.id.playbar_model -> {
         var currentModel = getPlayModel()
@@ -290,7 +327,7 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
           Constants.MODE_LOOP -> R.drawable.play_btn_loop
           Constants.MODE_SHUFFLE -> R.drawable.play_btn_shuffle
           else -> R.drawable.play_btn_loop_one
-        }, ThemeStore.getPlayerBtnColor()))
+        }, ThemeStore.playerBtnColor))
         val msg = if (currentModel == Constants.MODE_LOOP) getString(R.string.model_normal) else if (currentModel == Constants.MODE_SHUFFLE) getString(R.string.model_random) else getString(R.string.model_repeat)
         //刷新下一首
         if (currentModel != Constants.MODE_SHUFFLE) {
@@ -315,9 +352,8 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
   }
 
   @SuppressLint("CheckResult")
-  @OnClick(R.id.volume_down, R.id.volume_up, R.id.next_song)
-  fun onVolumeClick(view: View) {
-    when (view.id) {
+  private val onVolumeClick = View.OnClickListener { v ->
+    when (v.id) {
       R.id.volume_down -> Completable
           .fromAction {
             audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC,
@@ -341,13 +377,13 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
         handler.postDelayed(volumeRunnable, DELAY_SHOW_NEXT_SONG.toLong())
       }
     }
-    if (view.id != R.id.next_song) {
+    if (v.id != R.id.next_song) {
       Single.zip(Single.fromCallable { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) },
           Single.fromCallable { audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) },
           BiFunction { max: Int, current: Int -> longArrayOf(max.toLong(), current.toLong()) })
           .subscribeOn(Schedulers.io())
           .observeOn(AndroidSchedulers.mainThread())
-          .subscribe { longs: LongArray -> volume_seekbar.progress = (longs[1] * 1.0 / longs[1] * 100).toInt() }
+          .subscribe { longs: LongArray -> volume_seekbar.progress = (longs[1] * 1.0 / longs[0] * 100).toInt() }
     }
   }
 
@@ -377,12 +413,12 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
     highLightIndicator = GradientDrawableMaker()
         .width(width)
         .height(height)
-        .color(ThemeStore.getAccentColor())
+        .color(ThemeStore.accentColor)
         .make()
     normalIndicator = GradientDrawableMaker()
         .width(width)
         .height(height)
-        .color(ThemeStore.getAccentColor())
+        .color(ThemeStore.accentColor)
         .alpha(0.3f)
         .make()
     indicators.add(findViewById(R.id.guide_01))
@@ -533,13 +569,12 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
         fragmentManager.beginTransaction().remove(fragment).commitNow()
       }
     }
-    coverFragment = CoverFragment()
+    coverFragment = RoundCoverFragment()
     setUpCoverFragment()
     lyricFragment = LyricFragment()
     setUpLyricFragment()
 
     if (this.isPortraitOrientation()) {
-//      mRecordFragment = new RecordFragment();
 
       //Viewpager
       val adapter = PagerAdapter(supportFragmentManager)
@@ -553,15 +588,17 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
       val thresholdX = DensityUtil.dip2px(mContext, 60f)
       //下滑关闭
       view_pager.setOnTouchListener { v: View?, event: MotionEvent ->
-        if (event.action == MotionEvent.ACTION_DOWN) {
-          eventX1 = event.x
-          eventY1 = event.y
-        }
-        if (event.action == MotionEvent.ACTION_UP) {
-          eventX2 = event.x
-          eventY2 = event.y
-          if (eventY2 - eventY1 > thresholdY && abs(eventX1 - eventX2) < thresholdX) {
-            onBackPressed()
+        if (view_pager.currentItem == 0) {
+          if (event.action == MotionEvent.ACTION_DOWN) {
+            eventX1 = event.x
+            eventY1 = event.y
+          }
+          if (event.action == MotionEvent.ACTION_UP) {
+            eventX2 = event.x
+            eventY2 = event.y
+            if (eventY2 - eventY1 > thresholdY && abs(eventX1 - eventX2) < thresholdX) {
+              onBackPressed()
+            }
           }
         }
         false
@@ -603,16 +640,20 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
         override fun onClick() {}
         override fun onLongClick() {}
       })
-      lrcView?.setOnSeekToListener { progress: Int ->
-        if (progress > 0 && progress < getDuration()) {
-          MusicServiceRemote.setProgress(progress)
-          currentTime = progress
-          handler.sendEmptyMessage(UPDATE_TIME_ALL)
+
+      lrcView?.setOnSeekToListener(object : LrcView.OnSeekToListener {
+        override fun onSeekTo(progress: Int) {
+          if (progress > 0 && progress < getDuration()) {
+            MusicServiceRemote.setProgress(progress)
+            currentTime = progress
+            handler.sendEmptyMessage(UPDATE_TIME_ALL)
+          }
         }
-      }
-      lrcView?.setHighLightColor(ThemeStore.getTextColorPrimary())
-      lrcView?.setOtherColor(ThemeStore.getTextColorSecondary())
-      lrcView?.setTimeLineColor(ThemeStore.getTextColorSecondary())
+
+      })
+      lrcView?.setHighLightColor(ThemeStore.textColorPrimary)
+      lrcView?.setOtherColor(ThemeStore.textColorSecondary)
+      lrcView?.setTimeLineColor(ThemeStore.textColorSecondary)
     })
   }
 
@@ -644,7 +685,7 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
       //更新顶部信息
       updateTopStatus(song)
       //更新歌词
-      handler.postDelayed({ lyricFragment.updateLrc(song) }, 500)
+      handler.postDelayed({ lyricFragment.updateLrc(song) }, 50)
       //更新进度条
       val temp = getProgress()
       currentTime = if (temp in 1 until duration) temp else 0
@@ -689,7 +730,7 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
             handler.sendEmptyMessage(UPDATE_TIME_ALL)
             sleep(500)
           }
-        } catch (ignore: Exception){
+        } catch (ignore: Exception) {
         }
       }
     }
@@ -735,8 +776,8 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
    * 根据主题颜色修改按钮颜色
    */
   private fun setUpViewColor() {
-    val accentColor = ThemeStore.getAccentColor()
-    val tintColor = ThemeStore.getPlayerBtnColor()
+    val accentColor = ThemeStore.accentColor
+    val tintColor = ThemeStore.playerBtnColor
     updateSeekBarColor(accentColor)
     //        mProgressSeekBar.setThumb(Theme.getShape(GradientDrawable.OVAL,ThemeStore.getAccentColor(),DensityUtil.dip2px(context,10),DensityUtil.dip2px(context,10)));
 //        Drawable seekbarBackground = mProgressSeekBar.getBackground();
@@ -750,7 +791,7 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
     playbar_play_pause.setBackgroundColor(accentColor)
 
     //歌曲名颜色
-    top_title.setTextColor(ThemeStore.getPlayerTitleColor())
+    top_title.setTextColor(ThemeStore.playerTitleColor)
 
     //修改顶部按钮颜色
     Theme.tintDrawable(top_hide, R.drawable.icon_player_back, tintColor)
@@ -768,12 +809,12 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
 //        Theme.tintDrawable(mVolumeUp,R.drawable.ic_volume_up_black_24dp,tintColor);
     //下一首背景
     next_song.background = GradientDrawableMaker()
-        .color(ThemeStore.getPlayerNextSongBgColor())
+        .color(ThemeStore.playerNextSongBgColor)
         .corner(DensityUtil.dip2px(2f).toFloat())
         .width(DensityUtil.dip2px(288f))
         .height(DensityUtil.dip2px(38f))
         .make()
-    next_song.setTextColor(ThemeStore.getPlayerNextSongTextColor())
+    next_song.setTextColor(ThemeStore.playerNextSongTextColor)
   }
 
   private fun updateSeekBarColor(color: Int) {
@@ -802,7 +843,7 @@ class PlayerActivity : BaseMusicActivity(), FileCallback {
   private fun setProgressDrawable(seekBar: SeekBar, color: Int) {
     val progressDrawable = seekBar.progressDrawable as LayerDrawable
     //修改progress颜色
-    (progressDrawable.getDrawable(0) as GradientDrawable).setColor(ThemeStore.getPlayerProgressColor())
+    (progressDrawable.getDrawable(0) as GradientDrawable).setColor(ThemeStore.playerProgressColor)
     progressDrawable.getDrawable(1).setColorFilter(color, PorterDuff.Mode.SRC_IN)
     seekBar.progressDrawable = progressDrawable
   }

@@ -8,7 +8,6 @@ import android.view.View
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
-import butterknife.ButterKnife
 import kotlinx.android.synthetic.main.activity_eq.*
 import remix.myplayer.R
 import remix.myplayer.helper.EQHelper
@@ -39,7 +38,6 @@ class EQActivity : ToolbarActivity() {
     }
 
     setContentView(R.layout.activity_eq)
-    ButterKnife.bind(this)
 
     setUpToolbar(getString(R.string.eq))
 
@@ -55,14 +53,14 @@ class EQActivity : ToolbarActivity() {
       updateEnable(isChecked)
       eq_reset.isEnabled = EQHelper.enable
     }
-    TintHelper.setTintAuto(eq_switch, ThemeStore.getAccentColor(), false)
+    TintHelper.setTintAuto(eq_switch, ThemeStore.accentColor, false)
 
     //初始化重置按钮背景
-    TintHelper.setTintAuto(eq_reset, ThemeStore.getAccentColor(), false)
+    TintHelper.setTintAuto(eq_reset, ThemeStore.accentColor, false)
     eq_reset.isEnabled = EQHelper.enable
 
     val bandNumber = EQHelper.bandNumber
-    val accentColor = ThemeStore.getAccentColor()
+    val accentColor = ThemeStore.accentColor
 
     for (i in 0 until bandNumber) {
       val eqLayout = LayoutInflater.from(this).inflate(R.layout.layout_eq_seekbar, eq_container, false)

@@ -112,8 +112,9 @@
   <string name="timer">伴隨音樂入睡</string>
   <string name="as_default">設定為預設</string>
   <string name="close">關閉</string>
-  <string name="timer_info_1">「定時停止」時間設定為預設</string>
-  <string name="timer_info_2">「定時停止」時間設定為預設後，下次點擊定時停止按鈕後，將直接按照之前設定好的時間開始計時。\n\n想要更改「定時停止」的時長，點擊兩次定時停止按鈕即可進入設定頁面。</string>
+  <string name="timer_default_info_title">「定時停止」時間設定為預設</string>
+  <string name="timer_default_info_content">「定時停止」時間設定為預設後，下次點擊定時停止按鈕後，將直接按照之前設定好的時間開始計時。\n\n想要更改「定時停止」的時長，點擊兩次定時停止按鈕即可進入設定頁面。</string>
+  <string name="timer_pending_close">歌曲播放完畢再退出應用</string>
   <string name="input_feedback_content">請填寫回報內容</string>
   <string name="playing">正在播放</string>
   <string name="set_filter_size">設定排除檔案大小</string>
@@ -375,10 +376,12 @@
   <string name="show_displayname_tip">如果曲目清單出現亂碼可嘗試開啟該選項</string>
   <string name="accent_color">強調色</string>
   <string name="accent_color_tip">選擇你喜歡的強調色</string>
-  <string name="general_theme">全局主題</string>
-  <string name="light_theme">亮色</string>
-  <string name="dark_theme">暗色</string>
-  <string name="black_theme">黑色</string>
+  <string name="dark_theme">深色主題</string>
+  <string name="always_off">總是關閉</string>
+  <string name="always_on">總是開啟</string>
+  <string name="follow_system">跟隨系統</string>
+  <string name="black_theme">黑色主題</string>
+  <string name="black_theme_tip">當深色主題啟用時使用純黑色主題</string>
 
   <string name="md_back_label">返回</string>
   <string name="md_done_label">完成</string>

@@ -8,12 +8,11 @@ import androidx.recyclerview.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
 import android.widget.RelativeLayout;
-import butterknife.BindView;
 import java.util.Arrays;
 import java.util.List;
 import remix.myplayer.R;
+import remix.myplayer.databinding.ItemFloatLrcColorBinding;
 import remix.myplayer.theme.GradientDrawableMaker;
 import remix.myplayer.theme.ThemeStore;
 import remix.myplayer.ui.adapter.holder.BaseViewHolder;
@@ -60,7 +59,7 @@ public class DesktopLyricColorAdapter extends BaseAdapter<Integer, DesktopLyricC
 
   public void setCurrentColor(int color) {
     mCurrentColor = color;
-    ThemeStore.saveFloatLyricTextColor(color);
+    ThemeStore.setFloatLyricTextColor(color);
   }
 
 
@@ -74,11 +73,11 @@ public class DesktopLyricColorAdapter extends BaseAdapter<Integer, DesktopLyricC
     RelativeLayout.LayoutParams imgLayoutParam = new RelativeLayout.LayoutParams(
         DensityUtil.dip2px(context, 18), DensityUtil.dip2px(context, 18));
     imgLayoutParam.addRule(RelativeLayout.CENTER_IN_PARENT);
-    holder.mColor.setLayoutParams(imgLayoutParam);
+    holder.binding.itemColor.setLayoutParams(imgLayoutParam);
 
     RecyclerView.LayoutParams rootLayoutParam = new RecyclerView.LayoutParams(mItemWidth,
         ViewGroup.LayoutParams.MATCH_PARENT);
-    holder.mRoot.setLayoutParams(rootLayoutParam);
+    holder.binding.getRoot().setLayoutParams(rootLayoutParam);
 
     return holder;
   }
@@ -90,7 +89,7 @@ public class DesktopLyricColorAdapter extends BaseAdapter<Integer, DesktopLyricC
         ColorUtil.getColor(colorRes) : Color.parseColor("#F9F9F9");
 
     if (isColorChoose(holder.itemView.getContext(), colorRes)) {
-      holder.mColor.setBackground(new GradientDrawableMaker()
+      holder.binding.itemColor.setBackground(new GradientDrawableMaker()
           .shape(GradientDrawable.OVAL)
           .color(color)
           .strokeSize(DensityUtil.dip2px(1))
@@ -100,25 +99,23 @@ public class DesktopLyricColorAdapter extends BaseAdapter<Integer, DesktopLyricC
           .make()
       );
     } else {
-      holder.mColor.setBackground(new GradientDrawableMaker()
+      holder.binding.itemColor.setBackground(new GradientDrawableMaker()
           .shape(GradientDrawable.OVAL)
           .color(color)
           .width(SIZE)
           .height(SIZE)
           .make());
     }
-    holder.mRoot.setOnClickListener(v -> mOnItemClickListener.onItemClick(v, position));
+    holder.binding.getRoot().setOnClickListener(v -> mOnItemClickListener.onItemClick(v, position));
   }
 
   static class FloatColorHolder extends BaseViewHolder {
 
-    @BindView(R.id.item_color)
-    ImageView mColor;
+    private final ItemFloatLrcColorBinding binding;
 
-    //        @BindView(R.id.item_color_bg)
-//        SimpleDraweeView mColorBg;
-    public FloatColorHolder(View itemView) {
-      super(itemView);
+    public FloatColorHolder(View view) {
+      super(view);
+      this.binding = ItemFloatLrcColorBinding.bind(view);
     }
   }
 }

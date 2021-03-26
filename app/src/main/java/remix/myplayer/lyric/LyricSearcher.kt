@@ -165,7 +165,7 @@ class LyricSearcher {
    * @return
    */
   private fun getEmbeddedObservable(): Observable<List<LrcRow>> {
-    val tagEditor = TagEditor(song.url)
+    val tagEditor = TagEditor(song.data)
     return Observable.create { e ->
       val lyric = tagEditor.getFieldValueSingle(FieldKey.LYRICS).blockingGet()
       if (!lyric.isNullOrEmpty()) {
@@ -302,13 +302,13 @@ class LyricSearcher {
         .getNeteaseSearch(searchKey, 0, 1, 1)
         .flatMap {
           HttpClient.getInstance()
-              .getNeteaseLyric(Gson().fromJson(it.string(), NSongSearchResponse::class.java).result.songs[0].id)
+              .getNeteaseLyric(Gson().fromJson(it.string(), NSongSearchResponse::class.java)?.result?.songs?.get(0)?.id ?: 0)
               .map {
                 val lrcResponse = Gson().fromJson(it.string(), NLrcResponse::class.java)
-                val combine = lrcParser.getLrcRows(getBufferReader(lrcResponse.lrc.lyric.toByteArray()), false, cacheKey, searchKey)
+                val combine = lrcParser.getLrcRows(getBufferReader(lrcResponse.lrc?.lyric?.toByteArray() ?: "".toByteArray()), false, cacheKey, searchKey)
                 if (isCN && lrcResponse.tlyric != null && !lrcResponse.tlyric.lyric.isNullOrEmpty()) {
                   val translate = lrcParser.getLrcRows(getBufferReader(lrcResponse.tlyric.lyric.toByteArray()), false, cacheKey, searchKey)
-                  if (translate != null && translate.size > 0) {
+                  if (translate.isNotEmpty()) {
                     for (i in translate.indices) {
                       for (j in combine.indices) {
                         if (translate[i].time == combine[j].time) {
@@ -366,16 +366,19 @@ class LyricSearcher {
                 .map { lrcBody ->
                   val lrcResponse = Gson().fromJson(lrcBody.string(), QLrcResponse::class.java)
                   val combine = lrcParser.getLrcRows(getBufferReader(lrcResponse.lyric.toByteArray()), false, cacheKey, searchKey)
+                  combine.forEach {
+                    it.content = Util.htmlToText(it.content)
+                  }
                   if (lrcResponse.trans.isNotEmpty()) {
                     val translate = lrcParser.getLrcRows(getBufferReader(lrcResponse.trans.toByteArray()), false, cacheKey, searchKey)
-                    if (isCN && translate != null && translate.size > 0) {
-                      for (i in translate.indices) {
-                        if (translate[i].content.isNullOrEmpty() || translate[i].content == "//")
-                          continue
-                        for (j in combine.indices) {
-                          if (translate[i].time == combine[j].time) {
-                            combine[j].translate = translate[i].content
-                            break
+                    if (isCN && translate.size > 0) {
+                      translate.forEach {
+                        if (it.content.isNotEmpty() && it.content != "//") {
+                          for (i in combine.indices) {
+                            if (it.time == combine[i].time) {
+                              combine[i].translate = Util.htmlToText(it.content)
+                              break
+                            }
                           }
                         }
                       }
